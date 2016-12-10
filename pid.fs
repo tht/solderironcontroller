@@ -1,3 +1,8 @@
+\ PID controller written in Forth
+\ Based on the code presented here:
+\ http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/
+
+
 \ Setup variables for pid control
 0,0 2variable kp           \ absolute value
 0,0 2variable ki           \ scaled to sampling interval
@@ -11,6 +16,9 @@
 0,0 2variable total-i      \ cummulative i error
 0    variable last-input   \ last seen input
 
+
+\ =============================================================================
+\ Utility words
 
 \ Fixed point to signed number (rounded)
 : f2s ( f -- s ) swap 1 31 lshift and IF 1 + THEN ;
@@ -43,8 +51,68 @@
 \ Output fixed point value
 : f.000 3 f.n ;
 
-\ Calculates the difference to setpoint
-: diff2set ( s_is -- s_diff ) set-val @ swap - ;
+
+\ =============================================================================
+\ Main PID - internal definitions
+
+\ Calculate proportial error
+\ DO NOT CALL DIRECTLY... see `pid` below
+: calc-p ( f_error -- f_correction )
+  kp 2@ f*                 \ fetch k-value and scale error
+  ." Pval:" 2dup f2s .
+;
+
+
+\ Calculate integral error
+\ DO NOT CALL DIRECTLY... see `pid` below
+: calc-i ( f_error -- f_correction )
+  ki 2@ f*                 \ apply ki factor
+  total-i 2@ d+            \ sum up with running integral error
+  0,0 out-limit @ s2f drange \ cap inside output range
+  2dup total-i 2!          \ update running integral error
+  ." Ival:" 2dup f2s .
+;
+
+
+\ Calculate differential error - actually use "derivative on input", not on error
+\ DO NOT CALL DIRECTLY... see `pid` below
+: calc-d ( s_is -- f_correction )
+  dup ." CURR:" .
+  last-input @ -           \ substract last input from current input
+  dup ." DIFF:" .
+  s2f kd 2@ f*             \ make fixed point, fetch k-value and multiply
+  ." Dval:" 2dup f2s .
+;
+
+
+\ Do a PID calculation, returns correction value (aka duty-cycle)
+\ DO NOT CALL DIRECTLY... see `pid` below
+: pid_compute ( s_is -- s_corr )
+  CR ." SET:" set-val @ .  ." IS:"  dup . \ DEBUG
+
+  \ feed error in p and i, current setpoint in d, sum up results
+  dup dup set-val @ swap - s2f ( s_is s_is f_error )
+  2dup  calc-p             ( s_is s_is f_error f_p )
+  2swap calc-i d+          ( s_is s_is f_pi )
+  rot   calc-d d-          ( s_is f_pid ) \ substract! derivate on input - not error
+
+  f2s                      ( s_is s_corr )
+  dup ." OUT:" .           \ DEBUG
+
+  swap last-input !        \ Update variables for next run
+  0 out-limit @ range      \ Make sure we return something inside range
+
+  ." PWM:" dup .
+;
+
+
+\ =============================================================================
+\ Main PID - external interface
+
+\ Change setpoint on a running pid
+: set ( s -- )
+  set-val !
+;
 
 
 \ Change tuning-parameters on a running pid
@@ -58,11 +126,6 @@
   kp 2!
 ;
 
-\ Change setpoint on a running pid
-: set ( s -- )
-  set-val !
-;
-
 
 \ Init PID
 \ To use in a *reverse acting system* (bigger output value **reduced**
@@ -74,55 +137,7 @@
   interval !
   tuning
   0 out-override !         \ Make sure we're in manual mode
-  \ CR ." PID initialized - kp:" kp 2@ f.000 ." ki:" ki 2@ f.000 ." kd:" kd 2@ f.000
-;
-
-
-\ Calculate proportial error
-\ DO NOT CALL DIRECTLY... see `pid` below
-: calc-p ( s_is -- f_correction )
-  diff2set s2f             \ linear error as fixed point value
-  kp 2@ f*                 \ fetch k-value and scale error
-  ." Pval:" 2dup f2s .
-;
-
-\ Calculate integral error
-\ DO NOT CALL DIRECTLY... see `pid` below
-: calc-i ( s_is -- f_correction )
-  diff2set s2f             \ linear error as fixed point
-  ki 2@ f*                 \ apply ki factor
-  total-i 2@ d+            \ sum up with running integral error
-  0,0 out-limit @ s2f drange \ cap inside output range
-  2dup total-i 2!          \ update running integral error
-  ." Ival:" 2dup f2s .
-;
-
-\ Calculate differential error - actually use "derivative on input", not on error
-\ DO NOT CALL DIRECTLY... see `pid` below
-: calc-d ( s_is -- f_correction )
-  last-input @ -           \ substract last input from current input
-  s2f kd 2@ f*             \ make fixed point, fetch k-value and multiply
-  ." Dval:" 2dup f2s .
-;
-
-\ Do a PID calculation, returns correction value (aka duty-cycle)
-\ DO NOT CALL DIRECTLY... see `pid` below
-: pid_compute ( s_is -- s_corr )
-  dup >r \ store current value on return stack
-         \ current value still on stack for later use
-
-  CR ." SET:" set-val @ .  ." IS:"  dup . \ DEBUG
-
-     calc-p
-  r@ calc-i d+
-  r@ calc-d d-             \ substract here as we're using derivative on input, not on error
-
-  2dup ." OUT:" f2s .      \ DEBUG
-
-  r> last-input !          \ Update variables for next run
-  f2s 0 out-limit @ range  \ Make sure we return something inside range
-
-  ." PWM:" dup .
+  CR ." PID initialized - kp:" kp 2@ f.000 ." ki:" ki 2@ f.000 ." kd:" kd 2@ f.000
 ;
 
 
@@ -144,6 +159,7 @@
   out-override !
 ;
 
+
 \ Switches back to auto-mode after manual mode.
 : auto ( -- )
   out-override @ <> -1 IF \ only do something if we'r in override mode
@@ -154,6 +170,7 @@
     -1 out-override !
   THEN
 ;
+
 
 \ Brings PID back to auto-mode after a manual override
 \ set's last input reading as setpoint
