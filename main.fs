@@ -77,5 +77,5 @@ IMODE-ADC ADC-IN io-mode!
 
 \ Init PID
 320,0 1,5 0,0075 100 10000 pid-init
-150 setpoint
+150 set
 enable_systick_pid

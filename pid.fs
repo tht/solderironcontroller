@@ -59,7 +59,7 @@
 ;
 
 \ Change setpoint on a running pid
-: setpoint ( s -- )
+: set ( s -- )
   set-val !
 ;
 
@@ -83,7 +83,7 @@
 : calc-p ( s_is -- f_correction )
   diff2set s2f             \ linear error as fixed point value
   kp 2@ f*                 \ fetch k-value and scale error
-  ." Pval:" 2dup f.000
+  ." Pval:" 2dup f2s .
 ;
 
 \ Calculate integral error
@@ -94,7 +94,7 @@
   total-i 2@ d+            \ sum up with running integral error
   0,0 out-limit @ s2f drange \ cap inside output range
   2dup total-i 2!          \ update running integral error
-  ." Ival:" 2dup f.000
+  ." Ival:" 2dup f2s .
 ;
 
 \ Calculate differential error - actually use "derivative on input", not on error
@@ -102,7 +102,7 @@
 : calc-d ( s_is -- f_correction )
   last-input @ -           \ substract last input from current input
   s2f kd 2@ f*             \ make fixed point, fetch k-value and multiply
-  ." Dval:" 2dup f.000
+  ." Dval:" 2dup f2s .
 ;
 
 \ Do a PID calculation, returns correction value (aka duty-cycle)
@@ -117,12 +117,10 @@
   r@ calc-i d+
   r@ calc-d d-             \ substract here as we're using derivative on input, not on error
 
-  2dup ." OUT:" 4 f.n      \ DEBUG
+  2dup ." OUT:" f2s .      \ DEBUG
 
   r> last-input !          \ Update variables for next run
-
-  nip
-  0 out-limit @ range      \ Make sure we return something inside range
+  f2s 0 out-limit @ range  \ Make sure we return something inside range
 
   ." PWM:" dup .
 ;
@@ -130,12 +128,10 @@
 
 \ Returns calculated PID value or override value if in manual mode
 : pid ( s_is -- s_corr )
-  out-override @ -1 = IF
-    \ we're in auto-mode - do PID calculation
+  out-override @ -1 = IF   \ we're in auto-mode - do PID calculation
     pid_compute
-  ELSE
-    \ manual-mode! store input, return override value
-    dup CR ." IS:" .
+  ELSE                     \ manual-mode! store input, return override value
+    CR ." SET:" set-val @ .  ." IS:"  dup .
     last-input !
     out-override @
     dup ." PWM:" .
