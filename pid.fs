@@ -53,10 +53,9 @@
 
 
 \ =============================================================================
-\ Main PID - internal definitions
+\ Main PID - internal definitions (do not call manually)
 
 \ Calculate proportial error
-\ DO NOT CALL DIRECTLY... see `pid` below
 : calc-p ( f_error -- f_correction )
   kp 2@ f*                 \ fetch k-value and scale error
   ." Pval:" 2dup f2s .
@@ -64,7 +63,6 @@
 
 
 \ Calculate integral error
-\ DO NOT CALL DIRECTLY... see `pid` below
 : calc-i ( f_error -- f_correction )
   ki 2@ f*                 \ apply ki factor
   total-i 2@ d+            \ sum up with running integral error
@@ -75,18 +73,14 @@
 
 
 \ Calculate differential error - actually use "derivative on input", not on error
-\ DO NOT CALL DIRECTLY... see `pid` below
 : calc-d ( s_is -- f_correction )
-  dup ." CURR:" .
   last-input @ -           \ substract last input from current input
-  dup ." DIFF:" .
   s2f kd 2@ f*             \ make fixed point, fetch k-value and multiply
   ." Dval:" 2dup f2s .
 ;
 
 
 \ Do a PID calculation, returns correction value (aka duty-cycle)
-\ DO NOT CALL DIRECTLY... see `pid` below
 : pid_compute ( s_is -- s_corr )
   CR ." SET:" set-val @ .  ." IS:"  dup . \ DEBUG
 
