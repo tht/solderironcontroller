@@ -91,7 +91,7 @@
   rot   calc-d d-          ( s_is f_pid ) \ substract! derivate on input - not error
 
   f2s                      ( s_is s_corr )
-  dup ." OUT:" .           \ DEBUG
+  ." OUT:" dup .           \ DEBUG
 
   swap last-input !        \ Update variables for next run
   0 out-limit @ range      \ Make sure we return something inside range
@@ -111,13 +111,13 @@
 
 \ Change tuning-parameters on a running pid
 : tuning  ( f_kp f_ki f_kd -- )
-  \ depends on sampletime, so fetch it, move to fixed-point and change unit so seconds
+  \ depends on sampletime, so fetch it, move to fixed-point and change unit to seconds
   \ store on return stack for now
   interval @ s2f 1000,0 f/ 2>r
 
   2r@ f/ kd 2!             \ translate from 1/s to the sampletime
   2r> f* ki 2!             \ translate from 1/s to the sampletime
-  kp 2!
+         kp 2!
 ;
 
 
@@ -143,7 +143,7 @@
     CR ." SET:" set-val @ .  ." IS:"  dup .
     last-input !
     out-override @
-    dup ." PWM:" .
+    ." PWM:" dup .
   THEN
 ;
 
