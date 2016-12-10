@@ -1,10 +1,10 @@
 \ Define PID weights as fixed point
-0,0  2variable kp \ absolute value
-0,0  2variable ki \ scaled to sampling interval
-0,0  2variable kd \ scaled to sampling interval
-1000  variable interval \ sampling interval
-10000 variable out_limit \ output limit (0 to `out_limit`)
-0     variable out_override \ output override (manual mode unless -1)
+0,0 2variable kp \ absolute value
+0,0 2variable ki \ scaled to sampling interval
+0,0 2variable kd \ scaled to sampling interval
+0    variable interval \ sampling interval (in ms)
+0    variable out_limit \ output limit (0 to `out_limit`)
+0    variable out_override \ output override (manual mode unless -1)
 
 \ Working variables while pid is running
 0    variable set_val    \ current setpoint
@@ -19,18 +19,35 @@
 
 : f.000 3 f.n ;
 
-\ Init PID - use on *running* PID to change the tuning parameters
-\ To use in a *reverse acting system* (bigger output value **reduced**
-\ input value make sure `kp`, `ki` and `kd` are **all** negative.
-: +pid ( f_kp f_ki f_kd s_set s_sampletime -- )
-  dup s2f 1000,0 f/ 2>r \ store sampletime (in s) on return stack
-  interval !
-  set_val !
+
+\ Change tuning-parameters on a running pid
+: tuning  ( f_kp f_pi f_kd -- )
+  \ depends on sampletime, so fetch it, move to fixed-point and change unit so seconds
+  \ store on return stack for now
+  interval @ s2f 1000,0 f/ 2>r
+
   2r@ f/ kd 2! \ translate from 1/s to the sampletime
   2r> f* ki 2! \ translate from 1/s to the sampletime
   kp 2!
-  -1 out_override !
-  CR ." kp:" kp 2@ f.000 ." ki:" ki 2@ f.000 ." kd:" kd 2@ f.000
+;
+
+\ Change setpoint on a running pid
+: setpoint ( s -- )
+  set_val !
+;
+
+
+\ Init PID
+\ To use in a *reverse acting system* (bigger output value **reduced**
+\ input value make sure `kp`, `ki` and `kd` are **all** negative.
+\ Starts pid in manual mode (no setpoint set!). Set setpoint and call auto
+\ to start the control loop.
+: pid-init ( f_kp f_ki f_kd s_sampletime s_outlimit -- )
+  out_limit !
+  interval !
+  tuning
+  0 out_override !
+  \ CR ." PID initialized - kp:" kp 2@ f.000 ." ki:" ki 2@ f.000 ." kd:" kd 2@ f.000
 ;
 
 : diff2set ( s_is -- s_diff ) set_val @ swap - ;
@@ -99,43 +116,34 @@
     pid_compute
   ELSE
     \ manual-mode! store input, return override value
+    dup CR ." IS:" .
     last_input !
     out_override @
+    dup ." PWM:" .
   THEN
 ;
 
 \ Override output - switches PID into *manual mode*
-: pid_override ( s -- )
+: manual ( s -- )
   out_override !
 ;
 
-\ Brings PID back to auto-mode after a manual override
-\ set's last input reading as setpoint
-: pid_auto ( -- )
+: auto ( -- )
   out_override @ <> -1 IF \ only do something if we'r in override mode
     \ store current output value as i to let it run smoothly
     out_override @
     out_limit @ min 0 max \ Make sure we store something within PWM bounds
     s2f total_i 2!
-    last_input @ set_val ! \ Use last input as setpoint (no bumps!)
     -1 out_override !
   THEN
 ;
 
-
-\ DEBUG - sample code
-\ 120,0 2,2 0,01 350 100 +pid
-\ 100 pid .
-\ 200 pid .
-\ 300 pid .
-\ 400 pid .
-\ 400 pid .
-\ \ 1000 pid_override
-\ 350 pid .
-\ 350 pid .
-\ \ pid_auto
-\ 350 pid .
-
+\ Brings PID back to auto-mode after a manual override
+\ set's last input reading as setpoint
+: autohold ( -- )
+  last_input @ set_val ! \ Use last input as setpoint (no bumps!)
+  auto
+;
 
 
 \ Temporary fix for pwm and adc
@@ -233,5 +241,6 @@ IMODE-ADC ADC-IN io-mode!
 
 
 \ Init PID
-320,0 1,5 0,01 350 100 +pid
+320,0 1,5 0,0075 100 10000 pid-init
+150 setpoint
 
