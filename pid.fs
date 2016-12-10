@@ -48,9 +48,12 @@
 : calc_i ( s_is -- f_correction )
   diff2set s2f        \ linear error as fixed point
   ki 2@ f*            \ apply ki factor
-  total_i 2@ d+ 2dup  \ sum up with running integral
-  out_limit @ s2f d> IF \ check if we did run too high
+  total_i 2@ d+       \ sum up with running integral
+  2dup out_limit @ s2f d> IF \ check if we did run too high
     2drop out_limit @ s2f \ cap at out_limit
+  THEN
+  2dup 0,0 d< IF         \ check if we did run below output limit
+    2drop 0,0
   THEN
   2dup total_i 2!     \ update running integral error
   ." Ival:" 2dup f.000
@@ -188,18 +191,47 @@ IMODE-ADC ADC-IN io-mode!
 
 \ Control loop
 
-: onestep ( -- )
-  0 PWM-OUT pwm     \ disable pwm to get a good measurement
-  2 ms opamp-unprot \ wait 2ms before releasing OpAmp input protection
-  7 ms measure      \ wait 7ms before measuring to let the OpAmp settle down
-  opamp-prot 1 ms   \ start protection again, wait 1ms before ...
-  pid PWM-OUT pwm   \ calculating new duty-type and enable pwm on output
-  90 ms             \ let pwm run
+\ what happens when 
+\  ms action (next_step #)
+\   0 disable pwm (0)
+\   2 unprotect opamp (1)
+\   9 measure adc value (2)
+\     protect opamp, pid calculation
+\  10 enable pwm with new value (3)
+\ 100 repeat
+0 variable next_step
+0 variable wait_time
+
+: 1mshandler ( -- )
+  wait_time @ 0<> IF
+    -1 wait_time +!
+  ELSE
+    next_step @ case
+    0 of \ == 0 -> disable pwm
+      0 PWM-OUT pwm
+      1 next_step ! 1 wait_time ! \ 2 ms
+      endof
+    1 of \ == 1 -> unprotect opamp
+      opamp-unprot
+      2 next_step ! 7 wait_time ! \ 8 ms
+      endof
+    2 of \ == 2 -> do the work (measure, protect opamp, calculate pid)
+      measure opamp-prot pid PWM-OUT pwm
+      0 next_step ! 89 wait_time ! \ 90 ms
+      endof
+    endcase
+  THEN
+; 
+
+\ add 1mshandler for pid control to systick handler
+: ++ticks ( -- ) ++ticks 1mshandler ;
+
+\ enable the new ++ticks implementation 
+: enable_systick_pid ( -- )
+  ['] ++ticks irq-systick !
 ;
+
 
 \ Init PID
 320,0 1,5 0,01 350 100 +pid
 
-\ Define two loops for some seconds of runtime
-: 10sec 100 0 DO onestep LOOP 0 PWM-OUT pwm ;
-: 100sec 1000 0 DO onestep LOOP 0 PWM-OUT pwm ;
