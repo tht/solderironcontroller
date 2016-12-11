@@ -29,8 +29,72 @@ IMODE-ADC ADC-IN io-mode!
 \ 1400 130 K  -> 150°C (-20)
 \ 3670 330 K  -> 350°C (-20)
 
-: measure ( -- s_temp ) ADC-IN adc ADC-IN adc + 2/ 90 - 0 max 11 / 22 + ;
 
+\ Decide based on adc input if tip is missing
+: notip? ( s_adc -- flag )
+  4050 >
+;
+
+
+\ Measures adc input and checks for some common error conditions
+\ Switches to manual mode if there is an errror
+: measure ( -- s_temp )
+  ADC-IN adc ADC-IN adc + 2/
+  dup notip? IF
+    ." No tip connected - stopping pid"
+    0 manual
+    drop -1
+  ELSE
+    90 - 0 max 11 / 22 +
+  THEN
+;
+
+
+\ Check if the temp goes up while heating
+\ Sets an error if one sec passes without temp increase
+0 variable heat_start
+0 variable heat_temp
+0 variable heat_state
+
+: heatermonitor_on ( pwm -- pwm )
+  millis heat_start @ - 1000 > IF \ at least 1sec passed
+    0 heat_state !
+    last-input @ heat_temp @ - 10 < IF
+      \ less than 10°? There has to be an error
+      ." Heatermonitor decided there is something wrong as temp is NOT rising - stopping"
+      ." Temp at start:" heat_temp @ . ." now:" last-input @ .
+      0 manual \ disable pid
+      drop 0   \ force pwm out to 0
+    ELSE
+      ." heatmon is happy - stopped"
+    THEN
+  ELSE \ check if we're still needed here
+    dup 6000 < IF \ pwm < 6000, disable myself
+      0 heat_state !
+      ." heatmon stopped"
+    THEN
+  THEN
+;
+
+: heatermonitor_off ( pwm -- pwm )
+  dup 8000 > IF \ check if PWM > 8000
+    1 heat_state !
+    millis heat_start !
+    last-input @ heat_temp !
+    ." heatmon started"
+  THEN
+;
+
+: heatermonitor ( pwm -- pwm )
+  heat_state @ case
+  0 of \ standby or not initialized
+    heatermonitor_off
+    endof
+  1 of \ temp *should* go up
+    heatermonitor_on
+    endof
+  endcase
+;
 
 \ Control loop
 
@@ -59,7 +123,7 @@ IMODE-ADC ADC-IN io-mode!
       2 next_step ! 7 wait_time ! \ 8 ms
       endof
     2 of \ == 2 -> do the work (measure, protect opamp, calculate pid)
-      measure opamp-prot pid PWM-OUT pwm
+      measure opamp-prot pid heatermonitor PWM-OUT pwm
       0 next_step ! 89 wait_time ! \ 90 ms
       endof
     endcase
