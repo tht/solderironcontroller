@@ -24,20 +24,16 @@ PB0 constant ADC-IN
 adc-calib
 IMODE-ADC ADC-IN io-mode!
 
-\ Some measured adc values and corresponding temp (not exact!)
-\  100   0 K  ->  20°C (-20) 
-\ 1400 130 K  -> 150°C (-20)
-\ 3670 330 K  -> 350°C (-20)
-
 
 \ Decide based on adc input if tip is missing
 : notip? ( s_adc -- flag )
-  4050 >
+  4000 >
 ;
 
 
 \ Measures adc input and checks for some common error conditions
 \ Switches to manual mode if there is an errror
+\ Result is in 1/5°K (diff to environment)
 : measure ( -- s_temp )
   ADC-IN adc ADC-IN adc + 2/
   dup notip? IF
@@ -45,7 +41,7 @@ IMODE-ADC ADC-IN io-mode!
     0 manual
     drop -1
   ELSE
-    90 - 0 max 11 / 22 +
+    s2f 0,549 f* 147,355 d+ f2s
   THEN
 ;
 
@@ -140,6 +136,6 @@ IMODE-ADC ADC-IN io-mode!
 
 
 \ Init PID
-320,0 1,5 0,0075 100 10000 pid-init
-150 set
+64,0 0,3 0,0075 100 10000 pid-init
+1550 set \ about 330°C @20°C environment
 enable_systick_pid
