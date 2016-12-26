@@ -11,4 +11,4 @@
 ;
 
 \ always drop first value as this is still an old result
-: adc dup adc drop adc ;
+\ : adc dup adc drop adc ;
