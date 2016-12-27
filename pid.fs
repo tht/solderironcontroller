@@ -156,7 +156,7 @@
 
 \ Switches back to auto-mode after manual mode.
 : auto ( -- )
-  out-override @ <> -1 IF \ only do something if we'r in override mode
+  out-override @ -1 <> IF \ only do something if we'r in override mode
     \ store current output value as i to let it run smoothly
     out-override @
     0 out-limit @ range    \ Make sure we store something within PWM bounds
