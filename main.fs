@@ -130,6 +130,8 @@ IMODE-ADC ADC-IN io-mode!
   THEN
 ; 
 
+\ include pinchange.fs
+
 \ add 1mshandler for pid control to systick handler
 : ++ticks ( -- ) ++ticks 1mshandler ;
 
