@@ -1,7 +1,7 @@
 \ Make sure pwm is completly off at 0
 : pwm ( u pin -- )
   over 0 = IF
-    -pwm  \ disable pwm
+    pwm-deinit  \ disable pwm
     drop  \ drop output value
   ELSE
     \ enable pwm output on pin again
@@ -9,6 +9,3 @@
     pwm   \ set pwm output (duty cycle)
   THEN
 ;
-
-\ always drop first value as this is still an old result
-\ : adc dup adc drop adc ;

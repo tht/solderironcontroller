@@ -1,13 +1,13 @@
 \ Include PWM library
 include pid.fs
 
-\ Temporary fix for pwm and adc
+\ Temporary fix for pwm
 include tempfix.fs
 
 
 \ Init pwm for output
 PB6 constant PWM-OUT
-120 PWM-OUT +pwm
+120 PWM-OUT pwm-init
 0 PWM-OUT pwm
 
 \ and the MOSFET for protecting the OpAmps input
@@ -20,8 +20,7 @@ OMODE-PP OPPROT-OUT io-mode!
 
 \ Init adc for input
 PB0 constant ADC-IN
-+adc
-adc-calib
+adc-init adc-calib
 IMODE-ADC ADC-IN io-mode!
 
 
