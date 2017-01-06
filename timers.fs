@@ -57,7 +57,7 @@ num-timers 4 * cells buffer: timer-data
     false
   THEN nip ;
 
-\ Check and execute all the timer
+\ Check and execute all the timers
 : timer-run ( -- #exec )
   0 \ return number of executed tasks
   num-timers 0 DO
@@ -90,9 +90,9 @@ task: timertask
 : clear-timers ( -- ) timer-data num-timers 4 * cells 0 fill ;
 
 \ Register a callback or cancel a timer
-: call-once     ( callback when     timer# ) false swap call-internal ; 
-: call-periodic ( callback interval timer# ) true  swap call-internal ; 
-: cancel-timer  ( timer# ) tmr-call-addr 0 swap !  ;
+: call-after ( callback when     timer# ) false swap call-internal ; 
+: call-every ( callback interval timer# ) true  swap call-internal ; 
+: call-never ( timer# ) tmr-call-addr 0 swap !  ;
 
 \ Show all timer data
 : timers ( -- ) CR
