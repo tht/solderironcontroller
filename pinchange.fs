@@ -1,5 +1,7 @@
 compiletoram
 
+: -swd AFIO-MAPR @ %111 24 lshift bic 26 bit or AFIO-MAPR ! ;
+-swd
 
 \ kinda WORKING!
 \ see here for pinchange interrupt:
@@ -33,14 +35,8 @@ $40010400 constant EXTI
 
 0 variable debounce
 : ext3-tick ( -- )  \ interrupt handler for EXTI3
-  EXTI-PR @ 3 bit and IF
-    ." PB3" CR
-    3 bit EXTI-PR !
-  THEN
-  EXTI-PR @ 4 bit and IF
-    ." PB4" CR
-    4 bit EXTI-PR !
-  THEN
+  ." PB3" CR
+  3 bit EXTI-PR !
   millis debounce @ - 200 > IF
     toggle-heater
     millis debounce !
@@ -50,6 +46,6 @@ $40010400 constant EXTI
 
 ['] ext3-tick irq-exti3 !     \ install interrupt handler EXTI 3
 9 bit NVIC-EN0R bis!  \ enable EXTI3 interrupt 9
-%0001 12 lshift AFIO-EXTICR1 bis!  \ select P<B>3,4
-3 bit 4 bit or EXTI-IMR bis!  \ enable PB<3,4>
-3 bit 4 bit or EXTI-RTSR bis!  \ trigger on PC<3,4> rising edge
+%0001 12 lshift AFIO-EXTICR1 bis!  \ select P<B>4
+4 bit EXTI-IMR bis!  \ enable PB<4>
+4 bit EXTI-RTSR bis!  \ trigger on PB<4> rising edge
